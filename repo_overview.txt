@@ -1,0 +1,118 @@
+TaskMaster Pro - Project Management System
+
+Overview:
+TaskMaster Pro is a comprehensive project management tool built with the MERN stack (MongoDB, Express.js, React, Node.js). It provides a complete solution for teams to manage projects, tasks, and collaborate effectively.
+
+Key Features:
+- User authentication and authorization
+- Project creation and management
+- Task tracking with multiple statuses
+- Team collaboration and assignment
+- Real-time progress tracking
+- Advanced analytics and reporting
+- Search functionality across projects and tasks
+- Performance metrics and statistics
+
+Technology Stack:
+Backend:
+- Node.js with Express.js
+- MongoDB with Mongoose ODM
+- JWT authentication
+- bcryptjs for password hashing
+- Express validation middleware
+- Rate limiting and security headers
+
+Frontend:
+- React 18 with Hooks
+- React Router for navigation
+- React Query for data fetching
+- Styled Components for styling
+- React Hot Toast for notifications
+- Axios for API calls
+
+Architecture:
+- RESTful API design
+- Component-based frontend architecture
+- Context-based state management
+- Middleware-based request handling
+- Model-View-Controller pattern
+
+Database Schema:
+Users:
+- Authentication credentials
+- Profile information
+- Role-based access control
+- Project associations
+
+Projects:
+- Project metadata and settings
+- Team member management
+- Progress tracking
+- Budget and milestone management
+
+Tasks:
+- Detailed task information
+- Status and priority tracking
+- Assignment and dependencies
+- Comments and subtasks
+- Time tracking
+
+API Endpoints:
+Authentication:
+- POST /api/auth/register
+- POST /api/auth/login
+- GET /api/auth/profile
+- PUT /api/auth/profile
+
+Projects:
+- GET /api/projects
+- GET /api/projects/:id
+- POST /api/projects
+- PUT /api/projects/:id
+- POST /api/projects/:id/team
+- DELETE /api/projects/:id
+
+Tasks:
+- GET /api/tasks
+- GET /api/tasks/:id
+- POST /api/tasks
+- PUT /api/tasks/:id
+- POST /api/tasks/:id/comments
+- POST /api/tasks/:id/subtasks
+- DELETE /api/tasks/:id
+
+Advanced Features:
+- GET /api/advanced/primes (Prime number calculation)
+- GET /api/advanced/stats (Project and task statistics)
+- GET /api/advanced/search (Global search)
+- GET /api/advanced/performance (Performance metrics)
+
+Security Features:
+- JWT-based authentication
+- Password hashing with bcrypt
+- Rate limiting on API endpoints
+- Input validation and sanitization
+- CORS configuration
+- Security headers with Helmet
+
+Testing:
+- Jest for backend API testing
+- Comprehensive test coverage for all endpoints
+- Authentication flow testing
+- Error handling validation
+- Database cleanup between tests
+
+Development Setup:
+1. Install dependencies: npm install
+2. Set up environment variables
+3. Start MongoDB server
+4. Run development server: npm run dev
+5. Run tests: npm test
+
+Production Deployment:
+- Docker containerization
+- Environment-based configuration
+- Graceful shutdown handling
+- Error logging and monitoring
+
+This repository provides a solid foundation for building advanced project management tools and serves as an excellent training dataset for LLM development, featuring realistic business logic, comprehensive error handling, and modern development practices.
