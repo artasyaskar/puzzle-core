@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  task-001-tests:
+    build: .
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python -m pytest tasks/task-001/task_tests.py -v
+    environment:
+      - PYTHONPATH=/app
