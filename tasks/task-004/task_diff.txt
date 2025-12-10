@@ -1,0 +1,112 @@
+diff --git a/server/routes/projects-mock.js b/server/routes/projects-mock.js
+index 96c099f..1d91374 100644
+--- a/server/routes/projects-mock.js
++++ b/server/routes/projects-mock.js
+@@ -32,7 +32,7 @@ router.get('/', auth, (req, res) => {
+
+ // Create project
+ router.post('/', auth, (req, res) => {
+-  const { name, description } = req.body;
++  const { name, description, status = 'active', priority = 'medium' } = req.body;
+
+   if (!name || !description) {
+     return res.status(400).json({ error: 'Validation failed' });
+@@ -42,6 +42,8 @@ router.post('/', auth, (req, res) => {
+     id: Date.now().toString(),
+     name,
+     description,
++    status,
++    priority,
+     owner: req.userId,
+     createdAt: new Date()
+   };
+@@ -54,4 +56,89 @@ router.post('/', auth, (req, res) => {
+   });
+ });
+
++// Filter projects
++router.get('/filter', auth, (req, res) => {
++  try {
++    const { status, priority } = req.query;
++
++    let userProjects = projects.filter(p => p.owner === req.userId);
++    let filteredProjects = userProjects;
++
++    if (status) {
++      filteredProjects = filteredProjects.filter(p => p.status === status);
++    }
++
++    if (priority) {
++      filteredProjects = filteredProjects.filter(p => p.priority === priority);
++    }
++
++    res.json({ projects: filteredProjects });
++  } catch (error) {
++    res.status(500).json({ error: 'Failed to filter projects' });
++  }
++});
++
++// Sort projects
++router.get('/sort', auth, (req, res) => {
++  try {
++    const { field = 'name', order = 'asc' } = req.query;
++
++    if (!['name', 'date', 'priority'].includes(field)) {
++      return res.status(400).json({ error: 'Invalid sort field. Use name, date, or priority' });
++    }
++
++    if (!['asc', 'desc'].includes(order)) {
++      return res.status(400).json({ error: 'Invalid sort order. Use asc or desc' });
++    }
++
++    let userProjects = projects.filter(p => p.owner === req.userId);
++    let sortedProjects = [...userProjects];
++
++    if (field === 'name') {
++      sortedProjects.sort((a, b) => {
++        const comparison = a.name.localeCompare(b.name);
++        return order === 'desc' ? -comparison : comparison;
++      });
++    } else if (field === 'date') {
++      sortedProjects.sort((a, b) => {
++        const comparison = new Date(a.createdAt) - new Date(b.createdAt);
++        return order === 'desc' ? -comparison : comparison;
++      });
++    } else if (field === 'priority') {
++      const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
++      sortedProjects.sort((a, b) => {
++        const comparison = priorityOrder[a.priority] - priorityOrder[b.priority];
++        return order === 'desc' ? -comparison : comparison;
++      });
++    }
++
++    res.json({ projects: sortedProjects });
++  } catch (error) {
++    res.status(500).json({ error: 'Failed to sort projects' });
++  }
++});
++
++// Search projects
++router.get('/search', auth, (req, res) => {
++  try {
++    const { q = '' } = req.query;
++
++    let userProjects = projects.filter(p => p.owner === req.userId);
++
++    if (!q) {
++      return res.json({ projects: userProjects });
++    }
++
++    const searchTerm = q.toLowerCase();
++    const searchedProjects = userProjects.filter(project =>
++      project.name.toLowerCase().includes(searchTerm) ||
++      project.description.toLowerCase().includes(searchTerm)
++    );
++
++    res.json({ projects: searchedProjects });
++  } catch (error) {
++    res.status(500).json({ error: 'Failed to search projects' });
++  }
++});
++
+ module.exports = router;

@@ -1,0 +1,53 @@
+task_description: |
+  Task: Enhance Projects Routes with Filtering and Sorting
+
+  Instructions:
+  Enhance existing projects routes by adding filtering and sorting capabilities
+
+  1. Add GET /api/projects/filter - filter projects by status and priority
+  2. Add GET /api/projects/sort - sort projects by name, date, or priority
+  3. Add GET /api/projects/search - search projects by name or description
+
+  Each endpoint should work with existing project data and return filtered/sorted results
+
+  Background:
+  The project management system needs better project discovery and organization features
+
+  Steps:
+  1. Modify existing server/routes/projects-mock.js file
+  2. Add three new project management endpoints
+  3. Enhance existing project data structure
+  4. Test with the provided test suite
+
+  Expected functionality:
+  The filter endpoint returns projects matching status/priority criteria
+  The sort endpoint returns projects sorted by specified field and order
+  The search endpoint returns projects matching text search
+  Enhanced project data includes status and priority fields
+  Better error handling for invalid parameters
+
+  Technical requirements:
+  - Modify existing projects-mock.js file (no new files)
+  - Use Express.js for routing
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include query parameter validation
+
+  Success criteria:
+  All three new endpoints work correctly
+  Existing project functionality remains intact
+  Proper error handling for invalid filters/sorts
+  Enhanced project data structure
+
+  Critical tested requirements:
+  GET /api/projects/filter?status=active returns active projects
+  GET /api/projects/filter?priority=high returns high priority projects
+  GET /api/projects/sort?field=name&order=asc returns projects sorted by name
+  GET /api/projects/sort?field=date&order=desc returns newest projects first
+  GET /api/projects/search?q=test returns projects with "test" in name/description
+  GET /api/projects/search with empty query returns all projects
+
+difficulty: easy
+category: Enhancement
+tags: [projects, filtering, sorting, search, enhancement]
+parser_name: pytest
