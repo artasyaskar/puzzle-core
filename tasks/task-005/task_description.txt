@@ -1,0 +1,53 @@
+task_description: |
+  Task: Enhance Tasks Routes with Status Updates and Assignment
+
+  Instructions:
+  Enhance existing tasks routes by adding status update and assignment capabilities
+
+  1. Add PUT /api/tasks/:id/status - update task status
+  2. Add PUT /api/tasks/:id/assign - assign task to user
+  3. Add GET /api/tasks/my-tasks - get tasks assigned to current user
+
+  Each endpoint should work with existing task data and enhance task management
+
+  Background:
+  The task management system needs better status tracking and user assignment features
+
+  Steps:
+  1. Modify existing server/routes/tasks-mock.js file
+  2. Add three new task management endpoints
+  3. Enhance existing task data structure
+  4. Test with the provided test suite
+
+  Expected functionality:
+  The status endpoint updates task status with validation
+  The assign endpoint assigns tasks to users with validation
+  The my-tasks endpoint returns tasks assigned to current user
+  Enhanced task data includes status and assignedTo fields
+  Better error handling for invalid operations
+
+  Technical requirements:
+  - Modify existing tasks-mock.js file (no new files)
+  - Use Express.js for routing
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include parameter validation
+
+  Success criteria:
+  All three new endpoints work correctly
+  Existing task functionality remains intact
+  Proper error handling for invalid updates/assignments
+  Enhanced task data structure
+
+  Critical tested requirements:
+  PUT /api/tasks/:id/status with valid status updates task
+  PUT /api/tasks/:id/status with invalid status returns error
+  PUT /api/tasks/:id/assign assigns task to user
+  PUT /api/tasks/:id/assign with invalid user returns error
+  GET /api/tasks/my-tasks returns assigned tasks
+  GET /api/tasks/my-tasks with no assignments returns empty list
+
+difficulty: easy
+category: Enhancement
+tags: [tasks, status, assignment, enhancement, management]
+parser_name: pytest
