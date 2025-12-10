@@ -1,0 +1,51 @@
+task_description: |
+  Task: Implement Basic Calculator API for Project Budgets
+
+  Instructions:
+  Add calculator endpoints to help with project budget calculations and cost estimations
+
+  1. Create POST /api/calculator/add - sum project costs
+  2. Create POST /api/calculator/multiply - calculate total cost with quantity
+  3. Create POST /api/calculator/discount - apply discount to project budget
+
+  Each endpoint accepts numbers and returns calculated results
+
+  Background:
+  The project management system needs calculator utilities for budget calculations and cost estimations
+
+  Steps:
+  1. Create a new route file - name it server/routes/calculator.js
+  2. Implement three endpoints for calculator operations
+  3. Add the route to server/index-test.js
+  4. Test with the provided test suite
+
+  Expected functionality:
+  The add endpoint sums multiple numbers: [100, 200, 50] = 350
+  The multiply endpoint calculates total: cost 100 * quantity 3 = 300
+  The discount endpoint applies percentage: 1000 with 10% discount = 900
+  Handle edge cases like empty arrays and zero values
+  Validate input format
+
+  Technical requirements:
+  - Use Express.js for routing
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+
+  Success criteria:
+  All three endpoints work correctly with various inputs
+  Proper error handling for invalid inputs
+  Clean, readable code following project conventions
+
+  Critical tested requirements:
+  POST /api/calculator/add with [100, 200, 50] returns {"result": 350}
+  POST /api/calculator/add with [] returns {"result": 0}
+  POST /api/calculator/multiply with {"cost": 100, "quantity": 3} returns {"result": 300}
+  POST /api/calculator/multiply with {"cost": 50, "quantity": 0} returns {"result": 0}
+  POST /api/calculator/discount with {"amount": 1000, "percentage": 10} returns {"result": 900}
+  POST /api/calculator/discount with {"amount": 500, "percentage": 0} returns {"result": 500}
+
+difficulty: easy
+category: Feature
+tags: [calculator, budget, validation, math, utilities]
+parser_name: pytest
