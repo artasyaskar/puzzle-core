@@ -1,5 +1,5 @@
 const express = require('express');
-const { query } = require('express-validator');
+const { query, validationResult } = require('express-validator');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const User = require('../models/User');
@@ -9,70 +9,64 @@ const router = express.Router();
 
 // Prime number calculation endpoint
 router.get('/primes', auth, [
-  query('limit').optional().isInt({ min: 1, max: 10000 })
+  query('limit').optional().isInt({ min: 1, max: 10000 }).withMessage('Limit must be between 1 and 10000')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
     const limit = parseInt(req.query.limit) || 100;
     
-    // Simple prime number calculation
-    const isPrime = (n) => {
-      if (n <= 1) return false;
-      if (n <= 3) return true;
-      if (n % 2 === 0 || n % 3 === 0) return false;
-      for (let i = 5; i * i <= n; i += 6) {
-        if (n % i === 0 || n % (i + 2) === 0) return false;
+    // Simple prime number generator
+    const getPrimes = (n) => {
+      const primes = [];
+      let num = 2;
+      
+      while (primes.length < n) {
+        let isPrime = true;
+        for (let i = 2; i <= Math.sqrt(num); i++) {
+          if (num % i === 0) {
+            isPrime = false;
+            break;
+          }
+        }
+        if (isPrime) {
+          primes.push(num);
+        }
+        num++;
       }
-      return true;
+      
+      return primes;
     };
 
-    const primes = [];
-    let num = 2;
-    
-    while (primes.length < limit) {
-      if (isPrime(num)) {
-        primes.push(num);
-      }
-      num++;
-    }
+    const primes = getPrimes(limit);
 
     res.json({
       primes,
       limit,
-      count: primes.length,
-      maxPrime: Math.max(...primes)
+      count: primes.length
     });
   } catch (error) {
-    console.error('Prime calculation error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    console.error('Prime generation error:', error);
+    res.status(500).json({ error: 'Failed to generate primes' });
   }
 });
 
 // Project statistics endpoint
 router.get('/stats', auth, [
-  query('projectId').optional().isMongoId(),
-  query('timeRange').optional().isIn(['week', 'month', 'quarter', 'year'])
+  query('projectId').optional().isMongoId().withMessage('Invalid project ID'),
+  query('timeRange').optional().isIn(['day', 'week', 'month', 'year']).withMessage('Invalid time range')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
-    const { projectId, timeRange } = req.query;
-    
+    const { projectId, timeRange = 'month' } = req.query;
+
     // Build date filter based on time range
     let dateFilter = {};
     if (timeRange) {
@@ -80,15 +74,14 @@ router.get('/stats', auth, [
       let startDate;
       
       switch (timeRange) {
+        case 'day':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
         case 'week':
           startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           break;
         case 'month':
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'quarter':
-          const quarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), quarter * 3, 1);
           break;
         case 'year':
           startDate = new Date(now.getFullYear(), 0, 1);
@@ -205,30 +198,22 @@ router.get('/stats', auth, [
     });
   } catch (error) {
     console.error('Statistics calculation error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Failed to get statistics' });
   }
 });
 
 // Advanced search endpoint
 router.get('/search', auth, [
-  query('q').notEmpty().trim().escape(),
-  query('type').optional().isIn(['tasks', 'projects', 'users', 'all']),
-  query('limit').optional().isInt({ min: 1, max: 50 })
+  query('q').notEmpty().withMessage('Search query is required'),
+  query('type').optional().isIn(['all', 'tasks', 'projects', 'users']).withMessage('Invalid search type')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
-    const { q, type = 'all', limit = 20 } = req.query;
-    const searchRegex = new RegExp(q, 'i');
-    const results = {};
+    const { q, type = 'all' } = req.query;
 
     // Get user's accessible projects
     const userProjects = await Project.find({
@@ -244,74 +229,81 @@ router.get('/search', auth, [
       const tasks = await Task.find({
         project: { $in: projectIds },
         $or: [
-          { title: searchRegex },
-          { description: searchRegex },
-          { tags: searchRegex }
+          { title: new RegExp(q, 'i') },
+          { description: new RegExp(q, 'i') },
+          { tags: new RegExp(q, 'i') }
         ]
       })
       .populate('project', 'name')
       .populate('assignee', 'username firstName lastName')
-      .limit(limit);
+      .limit(20);
 
-      results.tasks = tasks;
+      res.json({
+        query: q,
+        type,
+        results: {
+          tasks
+        }
+      });
     }
 
     if (type === 'projects' || type === 'all') {
       const projects = await Project.find({
         _id: { $in: projectIds },
         $or: [
-          { name: searchRegex },
-          { description: searchRegex },
-          { tags: searchRegex }
+          { name: new RegExp(q, 'i') },
+          { description: new RegExp(q, 'i') },
+          { tags: new RegExp(q, 'i') }
         ]
       })
       .populate('owner', 'username firstName lastName')
       .populate('team.user', 'username firstName lastName')
-      .limit(limit);
+      .limit(20);
 
-      results.projects = projects;
+      res.json({
+        query: q,
+        type,
+        results: {
+          projects
+        }
+      });
     }
 
     if (type === 'users' || type === 'all') {
       const users = await User.find({
         isActive: true,
         $or: [
-          { username: searchRegex },
-          { firstName: searchRegex },
-          { lastName: searchRegex },
-          { email: searchRegex }
+          { username: new RegExp(q, 'i') },
+          { firstName: new RegExp(q, 'i') },
+          { lastName: new RegExp(q, 'i') },
+          { email: new RegExp(q, 'i') }
         ]
       })
       .select('username firstName lastName email role avatar')
-      .limit(limit);
+      .limit(20);
 
-      results.users = users;
+      res.json({
+        query: q,
+        type,
+        results: {
+          users
+        }
+      });
     }
-
-    res.json({
-      query: q,
-      type,
-      results
-    });
   } catch (error) {
     console.error('Advanced search error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 
 // Performance metrics endpoint
 router.get('/performance', auth, [
-  query('timeRange').optional().isIn(['week', 'month', 'quarter', 'year'])
+  query('timeRange').optional().isIn(['day', 'week', 'month', 'year']).withMessage('Invalid time range')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
     const { timeRange = 'month' } = req.query;
@@ -322,6 +314,10 @@ router.get('/performance', auth, [
     let groupFormat;
     
     switch (timeRange) {
+      case 'day':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        groupFormat = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
+        break;
       case 'week':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         groupFormat = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
@@ -329,11 +325,6 @@ router.get('/performance', auth, [
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         groupFormat = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
-        break;
-      case 'quarter':
-        const quarter = Math.floor(now.getMonth() / 3);
-        startDate = new Date(now.getFullYear(), quarter * 3, 1);
-        groupFormat = { $dateToString: { format: "%Y-%U", date: "$createdAt" } };
         break;
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1);
@@ -435,9 +426,7 @@ router.get('/performance', auth, [
     });
   } catch (error) {
     console.error('Performance metrics error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Failed to get performance metrics' });
   }
 });
 

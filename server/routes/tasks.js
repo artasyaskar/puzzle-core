@@ -1,86 +1,25 @@
 const express = require('express');
-const { body, validationResult, query } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all tasks (with filtering)
-router.get('/', auth, [
-  query('project').optional().isMongoId(),
-  query('assignee').optional().isMongoId(),
-  query('status').optional().isIn(['todo', 'in-progress', 'review', 'testing', 'completed', 'blocked']),
-  query('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 })
-], async (req, res) => {
+// Get tasks
+router.get('/', auth, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
-    }
-
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    // Build filter
-    const filter = {};
-
-    // Filter by projects user has access to
-    const userProjects = await Project.find({
+    const tasks = await Task.find({
       $or: [
-        { owner: req.userId },
-        { 'team.user': req.userId }
+        { assignee: req.userId },
+        { reporter: req.userId }
       ]
-    }).select('_id');
+    }).populate('project', 'name');
 
-    filter.project = { $in: userProjects.map(p => p._id) };
-
-    if (req.query.project) {
-      filter.project = req.query.project;
-    }
-
-    if (req.query.assignee) {
-      filter.assignee = req.query.assignee;
-    }
-
-    if (req.query.status) {
-      filter.status = req.query.status;
-    }
-
-    if (req.query.priority) {
-      filter.priority = req.query.priority;
-    }
-
-    const tasks = await Task.find(filter)
-      .populate('project', 'name status')
-      .populate('assignee', 'username firstName lastName')
-      .populate('reporter', 'username firstName lastName')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Task.countDocuments(filter);
-
-    res.json({
-      tasks,
-      pagination: {
-        current: page,
-        pages: Math.ceil(total / limit),
-        total,
-        limit
-      }
-    });
+    res.json({ tasks });
   } catch (error) {
     console.error('Get tasks error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Failed to get tasks' });
   }
 });
 
@@ -88,99 +27,58 @@ router.get('/', auth, [
 router.get('/:id', auth, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
-      .populate('project', 'name status owner team')
-      .populate('assignee', 'username firstName lastName email')
-      .populate('reporter', 'username firstName lastName email')
-      .populate('comments.author', 'username firstName lastName')
-      .populate('attachments.uploadedBy', 'username firstName lastName')
-      .populate('dependencies.task', 'title status');
+      .populate('project', 'name')
+      .populate('assignee', 'username firstName lastName')
+      .populate('reporter', 'username firstName lastName');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
-    }
-
-    // Check if user has access to this task's project
-    const project = task.project;
-    const hasAccess = project.owner.toString() === req.userId ||
-      project.team.some(member => member.user.toString() === req.userId);
-
-    if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     res.json({ task });
   } catch (error) {
     console.error('Get task error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Failed to get task' });
   }
 });
 
-// Create new task
+// Create task
 router.post('/', auth, [
-  body('title').notEmpty().trim().escape(),
-  body('description').notEmpty().trim().escape(),
-  body('project').notEmpty().isMongoId(),
-  body('assignee').optional().isMongoId(),
-  body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
-  body('type').optional().isIn(['feature', 'bug', 'improvement', 'documentation', 'testing']),
-  body('estimatedHours').optional().isInt({ min: 0, max: 1000 }),
-  body('dueDate').optional().isISO8601().toDate()
+  body('title').notEmpty().withMessage('Task title is required'),
+  body('description').notEmpty().withMessage('Task description is required'),
+  body('project').notEmpty().withMessage('Project is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
-    const { title, description, project, assignee, priority, type, estimatedHours, dueDate } = req.body;
+    const { title, description, project, priority, type, estimatedHours } = req.body;
 
-    // Check if user has access to the project
+    // Check if project exists
     const projectDoc = await Project.findById(project);
     if (!projectDoc) {
-      return res.status(404).json({
-        error: 'Project not found'
-      });
-    }
-
-    const hasAccess = projectDoc.owner.toString() === req.userId ||
-      projectDoc.team.some(member => member.user.toString() === req.userId);
-
-    if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied to this project'
-      });
+      return res.status(404).json({ error: 'Project not found' });
     }
 
     const task = new Task({
       title,
       description,
       project,
-      assignee: assignee || req.userId,
+      assignee: req.userId,
       reporter: req.userId,
       priority: priority || 'medium',
       type: type || 'feature',
-      estimatedHours,
-      dueDate
+      estimatedHours
     });
 
     await task.save();
 
     const populatedTask = await Task.findById(task._id)
-      .populate('project', 'name status')
+      .populate('project', 'name')
       .populate('assignee', 'username firstName lastName')
       .populate('reporter', 'username firstName lastName');
-
-    // Update project progress
-    await projectDoc.updateProgress();
 
     res.status(201).json({
       message: 'Task created successfully',
@@ -188,16 +86,14 @@ router.post('/', auth, [
     });
   } catch (error) {
     console.error('Create task error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Failed to create task' });
   }
 });
 
 // Update task
 router.put('/:id', auth, [
-  body('title').optional().notEmpty().trim().escape(),
-  body('description').optional().notEmpty().trim().escape(),
+  body('title').optional().notEmpty().withMessage('Task title is required'),
+  body('description').optional().notEmpty().withMessage('Task description is required'),
   body('status').optional().isIn(['todo', 'in-progress', 'review', 'testing', 'completed', 'blocked']),
   body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
   body('assignee').optional().isMongoId(),
@@ -208,18 +104,13 @@ router.put('/:id', auth, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
     const task = await Task.findById(req.params.id).populate('project');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     // Check if user has access to this task's project
@@ -227,9 +118,7 @@ router.put('/:id', auth, [
       task.project.team.some(member => member.user.toString() === req.userId);
 
     if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied'
-      });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const { title, description, status, priority, assignee, estimatedHours, actualHours, dueDate } = req.body;
@@ -246,9 +135,7 @@ router.put('/:id', auth, [
     if (status) {
       const canTransition = task.updateStatus(status);
       if (!canTransition) {
-        return res.status(400).json({
-          error: `Invalid status transition from ${task.status} to ${status}`
-        });
+        return res.status(400).json({ error: `Invalid status transition from ${task.status} to ${status}` });
       }
       updateData.status = status;
     }
@@ -262,7 +149,7 @@ router.put('/:id', auth, [
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('project', 'name status')
+    ).populate('project', 'name')
      .populate('assignee', 'username firstName lastName')
      .populate('reporter', 'username firstName lastName');
 
@@ -275,9 +162,7 @@ router.put('/:id', auth, [
     });
   } catch (error) {
     console.error('Update task error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -288,18 +173,13 @@ router.post('/:id/comments', auth, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
     const task = await Task.findById(req.params.id).populate('project');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     // Check if user has access to this task's project
@@ -307,9 +187,7 @@ router.post('/:id/comments', auth, [
       task.project.team.some(member => member.user.toString() === req.userId);
 
     if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied'
-      });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const { text } = req.body;
@@ -324,9 +202,7 @@ router.post('/:id/comments', auth, [
     });
   } catch (error) {
     console.error('Add comment error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -337,18 +213,13 @@ router.post('/:id/subtasks', auth, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed' });
     }
 
     const task = await Task.findById(req.params.id).populate('project');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     // Check if user has access to this task's project
@@ -356,9 +227,7 @@ router.post('/:id/subtasks', auth, [
       task.project.team.some(member => member.user.toString() === req.userId);
 
     if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied'
-      });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const { title } = req.body;
@@ -371,9 +240,7 @@ router.post('/:id/subtasks', auth, [
     });
   } catch (error) {
     console.error('Add subtask error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -383,9 +250,7 @@ router.put('/:id/subtasks/:subtaskId', auth, async (req, res) => {
     const task = await Task.findById(req.params.id).populate('project');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     // Check if user has access to this task's project
@@ -393,16 +258,12 @@ router.put('/:id/subtasks/:subtaskId', auth, async (req, res) => {
       task.project.team.some(member => member.user.toString() === req.userId);
 
     if (!hasAccess) {
-      return res.status(403).json({
-        error: 'Access denied'
-      });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const subtask = task.subtasks.id(req.params.subtaskId);
     if (!subtask) {
-      return res.status(404).json({
-        error: 'Subtask not found'
-      });
+      return res.status(404).json({ error: 'Subtask not found' });
     }
 
     subtask.completed = !subtask.completed;
@@ -414,9 +275,7 @@ router.put('/:id/subtasks/:subtaskId', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Toggle subtask error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -426,9 +285,7 @@ router.delete('/:id', auth, async (req, res) => {
     const task = await Task.findById(req.params.id).populate('project');
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Task not found'
-      });
+      return res.status(404).json({ error: 'Task not found' });
     }
 
     // Check if user is project owner or task reporter
@@ -436,9 +293,7 @@ router.delete('/:id', auth, async (req, res) => {
     const isReporter = task.reporter.toString() === req.userId;
 
     if (!isOwner && !isReporter) {
-      return res.status(403).json({
-        error: 'Access denied. Only project owner or task reporter can delete task'
-      });
+      return res.status(403).json({ error: 'Access denied. Only project owner or task reporter can delete task' });
     }
 
     await Task.findByIdAndDelete(req.params.id);
@@ -451,9 +306,7 @@ router.delete('/:id', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Delete task error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

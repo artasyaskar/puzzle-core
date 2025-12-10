@@ -1,57 +1,50 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
 // Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'fallback_secret', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  return jwt.sign({ userId }, process.env.JWT_SECRET || 'fallback-secret', {
+    expiresIn: '7d'
   });
 };
 
-// Register user
+// Register
 router.post('/register', [
-  body('username').isLength({ min: 3 }).trim().escape(),
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
-  body('firstName').notEmpty().trim().escape(),
-  body('lastName').notEmpty().trim().escape(),
-  body('role').optional().isIn(['admin', 'manager', 'developer', 'tester'])
+  body('username').notEmpty().withMessage('Username is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('firstName').notEmpty().withMessage('First name is required'),
+  body('lastName').notEmpty().withMessage('Last name is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
     }
 
-    const { username, email, password, firstName, lastName, role } = req.body;
+    const { username, email, password, firstName, lastName, role = 'developer' } = req.body;
 
-    // Check if user already exists
+    // Check if user exists
     const existingUser = await User.findOne({
       $or: [{ email }, { username }]
     });
 
     if (existingUser) {
-      return res.status(409).json({
-        error: 'User with this email or username already exists'
-      });
+      return res.status(409).json({ error: 'User with this email or username already exists' });
     }
 
-    // Create new user
+    // Create user
     const user = new User({
       username,
       email,
       password,
       firstName,
       lastName,
-      role: role || 'developer'
+      role
     });
 
     await user.save();
@@ -72,43 +65,34 @@ router.post('/register', [
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
-// Login user
+// Login
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty()
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
     }
 
     const { email, password } = req.body;
 
-    // Find user by email
-    const user = await User.findOne({ email, isActive: true });
+    // Find user
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({
-        error: 'Invalid credentials'
-      });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        error: 'Invalid credentials'
-      });
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Update last login
@@ -127,77 +111,73 @@ router.post('/login', [
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role,
-        lastLogin: user.lastLogin
+        role: user.role
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// Get current user profile
-router.get('/profile', auth, async (req, res) => {
+// Get profile
+router.get('/profile', async (req, res) => {
   try {
-    const user = await User.findById(req.userId).populate('projects', 'name status');
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
 
-    res.json({
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        avatar: user.avatar,
-        isActive: user.isActive,
-        lastLogin: user.lastLogin,
-        projects: user.projects
-      }
-    });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const user = await User.findById(decoded.userId).select('-password');
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
+
+    res.json({ user });
   } catch (error) {
     console.error('Profile error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
+    res.status(500).json({ error: 'Failed to load profile' });
   }
 });
 
-// Update user profile
-router.put('/profile', auth, [
-  body('firstName').optional().notEmpty().trim().escape(),
-  body('lastName').optional().notEmpty().trim().escape(),
-  body('avatar').optional().isURL()
+// Update profile
+router.put('/profile', [
+  body('firstName').optional().notEmpty().withMessage('First name cannot be empty'),
+  body('lastName').optional().notEmpty().withMessage('Last name cannot be empty'),
+  body('avatar').optional().isURL().withMessage('Avatar must be a valid URL')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+    }
+
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token.' });
     }
 
     const { firstName, lastName, avatar } = req.body;
-    const updateData = {};
 
-    if (firstName) updateData.firstName = firstName;
-    if (lastName) updateData.lastName = lastName;
-    if (avatar) updateData.avatar = avatar;
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (avatar) user.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    await user.save();
 
     res.json({
       message: 'Profile updated successfully',
@@ -212,10 +192,11 @@ router.put('/profile', auth, [
       }
     });
   } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    console.error('Update profile error:', error);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
+    res.status(500).json({ error: 'Profile update failed' });
   }
 });
 
