@@ -1,0 +1,62 @@
+task_description: |
+  Task: Extend Tasks API with Advanced Task Management Features
+
+  Instructions:
+  Enhance the existing tasks endpoints by adding advanced task management functionality to server/routes/tasks-mock.js
+
+  1. Add GET /api/tasks/:id - get single task details
+  2. Add PUT /api/tasks/:id - update task details
+  3. Add DELETE /api/tasks/:id - delete task
+  4. Add POST /api/tasks/:id/assign - assign task to user
+  5. Add POST /api/tasks/:id/status - update task status
+  6. Add POST /api/tasks/:id/comments - add comment to task
+
+  Each endpoint should be added to the existing tasks-mock.js file, not create new files
+
+  Background:
+  The task management system needs advanced features like detailed task views, assignment management, status tracking, and commenting to support collaborative work
+
+  Steps:
+  1. Edit server/routes/tasks-mock.js to add 6 new endpoints
+  2. Implement task CRUD operations and assignment/commenting features
+  3. Test with the provided test suite
+  4. All endpoints should use proper authentication and authorization
+
+  Expected functionality:
+  The get task endpoint returns full task details: GET /api/tasks/123
+  The update endpoint modifies task: PUT /api/tasks/123 with {"title": "Updated Task"}
+  The delete endpoint removes task: DELETE /api/tasks/123
+  The assign endpoint assigns task: POST /api/tasks/123/assign with {"assigneeId": "456"}
+  The status endpoint updates task status: POST /api/tasks/123/status with {"status": "in-progress"}
+  The comment endpoint adds comment: POST /api/tasks/123/comments with {"text": "Working on this"}
+  Handle edge cases like non-existent tasks, unauthorized access, and invalid operations
+  Use proper input validation and error handling
+
+  Technical requirements:
+  - Edit existing server/routes/tasks-mock.js file
+  - Use existing JWT token system for authentication
+  - add status, assigneeId, and comments array to task model
+  - Add proper authorization checks for task operations
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+  - Follow existing code patterns in the file
+
+  Success criteria:
+  All six new endpoints work correctly with various inputs
+  Proper error handling for invalid inputs and unauthorized access
+  Clean, readable code following existing project conventions
+  Integration with existing auth system
+
+  Critical tested requirements:
+  GET /api/tasks/123 returns task details with status and comments
+  PUT /api/tasks/123 with {"title": "Updated"} returns updated task
+  DELETE /api/tasks/123 returns success message
+  POST /api/tasks/123/assign with {"assigneeId": "456"} returns updated task
+  POST /api/tasks/123/status with {"status": "completed"} returns updated task
+  POST /api/tasks/123/comments with {"text": "Great work!"} returns updated task with comment
+
+difficulty: easy
+category: Enhancement
+tags: [tasks, management, collaboration, enhancement]
+parser_name: pytest

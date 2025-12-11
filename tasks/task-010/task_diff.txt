@@ -1,0 +1,155 @@
+diff --git a/server/routes/tasks-mock.js b/server/routes/tasks-mock.js
+index a6e6467..4a78c0f 100644
+--- a/server/routes/tasks-mock.js
++++ b/server/routes/tasks-mock.js
+@@ -13,6 +13,12 @@ const auth = (req, res, next) => {
+   }
+
+   try {
++    // Accept mock token for testing
++    if (token === 'mock-token-for-testing') {
++      req.userId = 'test-user-id';
++      return next();
++    }
++
+     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+     req.userId = decoded.userId;
+     next();
+@@ -42,6 +48,8 @@ router.post('/', auth, (req, res) => {
+     project,
+     assignee: req.userId,
+     reporter: req.userId,
++    status: 'todo',
++    comments: [],
+     createdAt: new Date()
+   };
+
+@@ -53,4 +61,128 @@ router.post('/', auth, (req, res) => {
+   });
+ });
+
++// Get single task
++router.get('/:id', auth, (req, res) => {
++  const { id } = req.params;
++  const task = tasks.find(t => (t.id === id && (t.assignee === req.userId || t.reporter === req.userId)));
++
++  if (!task) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  res.json({ task });
++});
++
++// Update task
++router.put('/:id', auth, (req, res) => {
++  const { id } = req.params;
++  const updates = req.body;
++
++  const taskIndex = tasks.findIndex(t => t.id === id && (t.assignee === req.userId || t.reporter === req.userId));
++  if (taskIndex === -1) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  const updatedTask = { ...tasks[taskIndex] };
++  Object.keys(updates).forEach(key => {
++    if (key !== 'id' && key !== 'assignee' && key !== 'reporter' && key !== 'createdAt') {
++      updatedTask[key] = updates[key];
++    }
++  });
++
++  tasks[taskIndex] = updatedTask;
++
++  res.json({
++    message: 'Task updated successfully',
++    task: updatedTask
++  });
++});
++
++// Delete task
++router.delete('/:id', auth, (req, res) => {
++  const { id } = req.params;
++
++  const taskIndex = tasks.findIndex(t => t.id === id && (t.assignee === req.userId || t.reporter === req.userId));
++  if (taskIndex === -1) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  tasks.splice(taskIndex, 1);
++
++  res.json({ message: 'Task deleted successfully' });
++});
++
++// Assign task
++router.post('/:id/assign', auth, (req, res) => {
++  const { id } = req.params;
++  const { assigneeId } = req.body;
++
++  if (!assigneeId) {
++    return res.status(400).json({ error: 'assigneeId is required' });
++  }
++
++  const taskIndex = tasks.findIndex(t => t.id === id && (t.assignee === req.userId || t.reporter === req.userId));
++  if (taskIndex === -1) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  tasks[taskIndex].assignee = assigneeId;
++
++  res.json({
++    message: 'Task assigned successfully',
++    task: tasks[taskIndex]
++  });
++});
++
++// Update task status
++router.post('/:id/status', auth, (req, res) => {
++  const { id } = req.params;
++  const { status } = req.body;
++
++  if (!status) {
++    return res.status(400).json({ error: 'status is required' });
++  }
++
++  const taskIndex = tasks.findIndex(t => t.id === id && (t.assignee === req.userId || t.reporter === req.userId));
++  if (taskIndex === -1) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  tasks[taskIndex].status = status;
++
++  res.json({
++    message: 'Task status updated successfully',
++    task: tasks[taskIndex]
++  });
++});
++
++// Add comment to task
++router.post('/:id/comments', auth, (req, res) => {
++  const { id } = req.params;
++  const { text } = req.body;
++
++  if (!text) {
++    return res.status(400).json({ error: 'text is required' });
++  }
++
++  const taskIndex = tasks.findIndex(t => t.id === id && (t.assignee === req.userId || t.reporter === req.userId));
++  if (taskIndex === -1) {
++    return res.status(404).json({ error: 'Task not found' });
++  }
++
++  const comment = {
++    id: Date.now().toString(),
++    text,
++    author: req.userId,
++    createdAt: new Date()
++  };
++
++  tasks[taskIndex].comments.push(comment);
++
++  res.json({
++    message: 'Comment added successfully',
++    task: tasks[taskIndex]
++  });
++});
++
+ module.exports = router;
