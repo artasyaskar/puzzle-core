@@ -1,0 +1,58 @@
+task_description: |
+  Task: Implement Date/Time Utilities API for Project Management
+
+  Instructions:
+  Add date/time utility endpoints to help with project scheduling and deadline management
+
+  1. Create POST /api/datetime/current - get current date and time
+  2. Create POST /api/datetime/add-days - add days to a given date
+  3. Create POST /api/datetime/diff-days - calculate difference between two dates
+  4. Create POST /api/datetime/format - format date to readable string
+  5. Create POST /api/datetime/is-weekend - check if date falls on weekend
+  6. Create POST /api/datetime/due-soon - check if date is within 3 days
+
+  Each endpoint accepts date inputs and returns processed results
+
+  Background:
+  The project management system needs date/time utilities for scheduling, deadline tracking, and timeline management
+
+  Steps:
+  1. Create a new route file - name it server/routes/datetime.js
+  2. Implement six endpoints for date/time operations
+  3. Add the route to server/index-test.js
+  4. Test with the provided test suite
+
+  Expected functionality:
+  The current endpoint returns current date/time in ISO format
+  The add-days endpoint adds specified days to a date: "2024-01-01" + 5 days = "2024-01-06"
+  The diff-days endpoint calculates days between dates: "2024-01-01" to "2024-01-05" = 4 days
+  The format endpoint converts dates: "2024-01-01" to "January 1, 2024"
+  The is-weekend endpoint checks if date is Saturday/Sunday
+  The due-soon endpoint checks if date is within 3 days from today
+  Handle invalid dates appropriately
+  Validate input format
+
+  Technical requirements:
+  - Use Express.js for routing
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+  - Use JavaScript Date object or date-fns library
+
+  Success criteria:
+  All six endpoints work correctly with various inputs
+  Proper error handling for invalid inputs
+  Clean, readable code following project conventions
+
+  Critical tested requirements:
+  POST /api/datetime/current returns current date/time
+  POST /api/datetime/add-days with {"date": "2024-01-01", "days": 5} returns {"result": "2024-01-06"}
+  POST /api/datetime/diff-days with {"start": "2024-01-01", "end": "2024-01-05"} returns {"result": 4}
+  POST /api/datetime/format with {"date": "2024-01-01"} returns {"result": "January 1, 2024"}
+  POST /api/datetime/is-weekend with {"date": "2024-01-06"} returns {"result": true}
+  POST /api/datetime/due-soon with {"date": [3 days from today]} returns {"result": true}
+
+difficulty: easy
+category: Feature
+tags: [datetime, scheduling, validation, formatting, utilities]
+parser_name: pytest
