@@ -74,7 +74,7 @@ else
 
   # Apply diff only if endpoints missing AND no pre-existing changes AND single initial commit (null-agent path)
   # OR if oracle agent path (git fails) but endpoints missing
-  echo "DEBUG: Checking diff application conditions..." >&2
+  echo "DEBUG: Checking diff application conditions... (VERSION 2)" >&2
   echo "DEBUG: DIFF_FILE exists: $([ -f "$DIFF_FILE" ] && echo "YES" || echo "NO")" >&2
   echo "DEBUG: ENDPOINTS_PRESENT: $ENDPOINTS_PRESENT" >&2
   echo "DEBUG: PRECHANGES: $PRECHANGES" >&2
