@@ -126,12 +126,19 @@ else
       # Check if this is oracle agent path (git commands failed)
       if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
         echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
-        # Apply diff using direct patch method for oracle agent
+        # Apply diff using direct patch method for oracle agent (git doesn't work in container)
         if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
           echo "patch -p0 succeeded for oracle agent"
           APPLIED=1
         else
-          echo "Failed to apply diff for oracle agent" 1>&2
+          echo "Failed to apply diff for oracle agent with patch, trying git apply..." 1>&2
+          # Try git apply as last resort (will likely fail in oracle container)
+          if git apply --reject --whitespace=fix "$DIFF_FILE" 2>/dev/null; then
+            echo "git apply succeeded as fallback"
+            APPLIED=1
+          else
+            echo "Both patch and git apply failed for oracle agent" 1>&2
+          fi
         fi
       else
         echo "Task features not present and no diff applied (null path). Aborting." 1>&2
