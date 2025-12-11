@@ -58,6 +58,10 @@ else
     if git diff --name-only -- server/middleware/validate.js server/routes/advanced.js server/services/calculator.js | grep -q "."; then
       PRECHANGES=1
     fi
+  else
+    # Git is not working, set defaults for oracle agent
+    COMMITS=0
+    PRECHANGES=0
   fi
 
   # Determine if advanced endpoints already implemented
