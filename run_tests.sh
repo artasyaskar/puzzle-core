@@ -70,7 +70,9 @@ else
   # OR if oracle agent path (multiple commits) but endpoints missing
   APPLY_DIFF=0
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
-    APPLY_DIFF=1
+    # Null-agent path: DON'T apply diff, let it fail as designed
+    echo "Null-agent path: endpoints missing but diff not applied (as expected)" >&2
+    APPLY_DIFF=0
   elif [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$COMMITS" -gt 1 ]; then
     echo "Oracle agent path detected but endpoints missing; applying diff..." >&2
     APPLY_DIFF=1
