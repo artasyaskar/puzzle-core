@@ -1,0 +1,60 @@
+task_description: |
+  Task: Extend Advanced Analytics API with Enhanced Endpoints
+
+  Instructions:
+  Enhance the existing advanced analytics endpoints by adding new functionality to server/routes/advanced-mock.js
+
+  1. Add POST /api/advanced/fibonacci - generate Fibonacci sequence
+  2. Add POST /api/advanced/factorial - calculate factorial of a number
+  3. Add POST /api/advanced/palindrome - check if string is palindrome
+  4. Add POST /api/advanced/anagram - check if two strings are anagrams
+  5. Add POST /api/advanced/roman-to-int - convert Roman numeral to integer
+  6. Add POST /api/advanced/power - calculate power of a number
+
+  Each endpoint should be added to the existing advanced-mock.js file, not create new files
+
+  Background:
+  The advanced analytics system needs additional mathematical and string manipulation utilities to enhance its analytical capabilities
+
+  Steps:
+  1. Edit server/routes/advanced-mock.js to add 6 new endpoints
+  2. Implement the mathematical and string operations
+  3. Test with the provided test suite
+  4. All endpoints should use the existing auth middleware
+
+  Expected functionality:
+  The fibonacci endpoint generates sequence: {"n": 5} returns {"result": [0, 1, 1, 2, 3]}
+  The factorial endpoint calculates: {"number": 5} returns {"result": 120}
+  The palindrome endpoint checks: {"text": "racecar"} returns {"result": true}
+  The anagram endpoint checks: {"str1": "listen", "str2": "silent"} returns {"result": true}
+  The roman-to-int endpoint converts: {"roman": "XIV"} returns {"result": 14}
+  The power endpoint calculates: {"base": 2, "exponent": 3} returns {"result": 8}
+  Handle edge cases like zero, negative numbers, and invalid inputs
+  Use proper input validation
+
+  Technical requirements:
+  - Edit existing server/routes/advanced-mock.js file
+  - Use existing auth middleware for all endpoints
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+  - Follow existing code patterns in the file
+
+  Success criteria:
+  All six new endpoints work correctly with various inputs
+  Proper error handling for invalid inputs
+  Clean, readable code following existing project conventions
+  Integration with existing auth system
+
+  Critical tested requirements:
+  POST /api/advanced/fibonacci with {"n": 5} returns {"result": [0, 1, 1, 2, 3]}
+  POST /api/advanced/fibonacci with {"n": 0} returns {"result": []}
+  POST /api/advanced/factorial with {"number": 5} returns {"result": 120}
+  POST /api/advanced/factorial with {"number": 0} returns {"result": 1}
+  POST /api/advanced/palindrome with {"text": "racecar"} returns {"result": true}
+  POST /api/advanced/palindrome with {"text": "hello"} returns {"result": false}
+
+difficulty: easy
+category: Enhancement
+tags: [analytics, math, strings, algorithms, enhancement]
+parser_name: pytest
