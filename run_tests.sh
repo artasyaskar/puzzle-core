@@ -82,15 +82,23 @@ else
   
   # Use a more robust check for commits count
   COMMITS_CHECK=0
-  if [ "$COMMITS" -le 1 ] 2>/dev/null; then
-    COMMITS_CHECK=1
-  fi
+  # Check if COMMITS is a valid number and <= 1
+  case "$COMMITS" in
+    ''|*[!0-9]*) 
+      COMMITS_CHECK=0
+      ;;
+    *)
+      if [ "$COMMITS" -le 1 ] 2>/dev/null; then
+        COMMITS_CHECK=1
+      fi
+      ;;
+  esac
   echo "DEBUG: COMMITS <= 1: $([ "$COMMITS_CHECK" -eq 1 ] && echo "YES" || echo "NO")" >&2
   
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS_CHECK" -eq 1 ]; then
     echo "DEBUG: Entering diff application section!" >&2
     # Check if this is oracle agent path (git commands failed)
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS_CHECK" -eq 0 ]; then
       echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
       echo "DEBUG: DIFF_FILE=$DIFF_FILE" >&2
       echo "DEBUG: Checking if patch command exists..." >&2
@@ -161,7 +169,7 @@ else
     echo "Advanced endpoints already present; skipping diff apply." >&2
   elif [ -f "$DIFF_FILE" ] && [ "$PRECHANGES" -ne 0 ]; then
     echo "Detected pre-existing changes to target files; skipping diff apply to avoid overwriting agent edits." >&2
-  elif [ -f "$DIFF_FILE" ] && [ "$COMMITS" -gt 1 ]; then
+  elif [ -f "$DIFF_FILE" ] && [ "$COMMITS_CHECK" -eq 0 ] && [ "$COMMITS" != "" ]; then
     echo "Detected multiple commits (agent edits present); skipping diff apply." >&2
   fi
   if [ ! -f "$DIFF_FILE" ]; then
