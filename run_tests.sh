@@ -172,7 +172,7 @@ else
 
   # If endpoints still missing and diff not applied, fail only for null path (single commit, no prechanges)
   if [ "$APPLIED" -eq 0 ] && ! grep -q "/adv/stats" server/routes/advanced.js 2>/dev/null; then
-    if [ "$COMMITS" -le 1 ] && [ "$PRECHANGES" -eq 0 ]; then
+    if [ "$COMMITS_CHECK" -eq 1 ] && [ "$PRECHANGES" -eq 0 ]; then
       echo "Task features not present and no diff applied (null path). Aborting." 1>&2
       echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
       exit 3
