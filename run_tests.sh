@@ -53,8 +53,6 @@ else
   PRECHANGES=0
   COMMITS=0
   # Detect if targeted source files already modified (scope only to 3 files)
-  COMMITS=0  # Always initialize to 0 first
-  PRECHANGES=0  # Always initialize to 0 first
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     COMMITS=$(git rev-list --count HEAD 2>/dev/null || echo 0)
     if git diff --name-only -- server/middleware/validate.js server/routes/advanced.js server/services/calculator.js | grep -q "."; then
@@ -74,38 +72,17 @@ else
 
   # Apply diff only if endpoints missing AND no pre-existing changes AND single initial commit (null-agent path)
   # OR if oracle agent path (git fails) but endpoints missing
-  echo "DEBUG: Checking diff application conditions... (VERSION 2)" >&2
+  echo "DEBUG: Checking diff application conditions..." >&2
   echo "DEBUG: DIFF_FILE exists: $([ -f "$DIFF_FILE" ] && echo "YES" || echo "NO")" >&2
   echo "DEBUG: ENDPOINTS_PRESENT: $ENDPOINTS_PRESENT" >&2
   echo "DEBUG: PRECHANGES: $PRECHANGES" >&2
-  echo "DEBUG: COMMITS: '$COMMITS'" >&2
-  echo "DEBUG: About to enter robust check..." >&2
+  echo "DEBUG: COMMITS: $COMMITS" >&2
+  echo "DEBUG: COMMITS <= 1: $([ "$COMMITS" -le 1 ] && echo "YES" || echo "NO")" >&2
   
-  # Use a more robust check for commits count
-  COMMITS_CHECK=0
-  # Check if COMMITS is a valid number and <= 1
-  case "$COMMITS" in
-    ''|*[!0-9]*) 
-      COMMITS_CHECK=0
-      echo "DEBUG: COMMITS is empty or non-numeric" >&2
-      ;;
-    *)
-      if [ "$COMMITS" -le 1 ] 2>/dev/null; then
-        COMMITS_CHECK=1
-        echo "DEBUG: COMMITS is numeric and <= 1" >&2
-      else
-        echo "DEBUG: COMMITS is numeric but > 1" >&2
-      fi
-      ;;
-  esac
-  echo "DEBUG: COMMITS_CHECK = $COMMITS_CHECK" >&2
-  echo "DEBUG: COMMITS <= 1: $([ "$COMMITS_CHECK" -eq 1 ] && echo "YES" || echo "NO")" >&2
-  echo "DEBUG: About to check diff conditions..." >&2
-  
-  if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS_CHECK" -eq 1 ]; then
+  if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
     echo "DEBUG: Entering diff application section!" >&2
     # Check if this is oracle agent path (git commands failed)
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS_CHECK" -eq 0 ]; then
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
       echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
       echo "DEBUG: DIFF_FILE=$DIFF_FILE" >&2
       echo "DEBUG: Checking if patch command exists..." >&2
@@ -176,7 +153,7 @@ else
     echo "Advanced endpoints already present; skipping diff apply." >&2
   elif [ -f "$DIFF_FILE" ] && [ "$PRECHANGES" -ne 0 ]; then
     echo "Detected pre-existing changes to target files; skipping diff apply to avoid overwriting agent edits." >&2
-  elif [ -f "$DIFF_FILE" ] && [ "$COMMITS_CHECK" -eq 0 ] && [ "$COMMITS" != "" ]; then
+  elif [ -f "$DIFF_FILE" ] && [ "$COMMITS" -gt 1 ]; then
     echo "Detected multiple commits (agent edits present); skipping diff apply." >&2
   fi
   if [ ! -f "$DIFF_FILE" ]; then
@@ -187,7 +164,7 @@ else
 
   # If endpoints still missing and diff not applied, fail only for null path (single commit, no prechanges)
   if [ "$APPLIED" -eq 0 ] && ! grep -q "/adv/stats" server/routes/advanced.js 2>/dev/null; then
-    if [ "$COMMITS_CHECK" -eq 1 ] && [ "$PRECHANGES" -eq 0 ]; then
+    if [ "$COMMITS" -le 1 ] && [ "$PRECHANGES" -eq 0 ]; then
       echo "Task features not present and no diff applied (null path). Aborting." 1>&2
       echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
       exit 3
@@ -209,7 +186,7 @@ else
   fi
 
   # Start server in background for HTTP-based pytest
-  node server/index-test.js &
+  node server/index.js &
   SERVER_PID=$!
   cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
@@ -219,7 +196,7 @@ else
 
   # Wait for health endpoint
   i=0
-  until curl -sf "http://localhost:5001/health" >/dev/null 2>&1; do
+  until curl -sf "http://localhost:3000/health" >/dev/null 2>&1; do
     i=$((i+1))
     [ $i -gt 50 ] && echo "Server failed to start" 1>&2 && exit 1
     sleep 0.2
