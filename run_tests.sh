@@ -53,6 +53,8 @@ else
   PRECHANGES=0
   COMMITS=0
   # Detect if targeted source files already modified (scope only to 3 files)
+  COMMITS=0  # Always initialize to 0 first
+  PRECHANGES=0  # Always initialize to 0 first
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     COMMITS=$(git rev-list --count HEAD 2>/dev/null || echo 0)
     if git diff --name-only -- server/middleware/validate.js server/routes/advanced.js server/services/calculator.js | grep -q "."; then
