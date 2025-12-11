@@ -79,9 +79,15 @@ else
   echo "DEBUG: ENDPOINTS_PRESENT: $ENDPOINTS_PRESENT" >&2
   echo "DEBUG: PRECHANGES: $PRECHANGES" >&2
   echo "DEBUG: COMMITS: $COMMITS" >&2
-  echo "DEBUG: COMMITS <= 1: $([ "$COMMITS" -le 1 ] && echo "YES" || echo "NO")" >&2
   
-  if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
+  # Use a more robust check for commits count
+  COMMITS_CHECK=0
+  if [ "$COMMITS" -le 1 ] 2>/dev/null; then
+    COMMITS_CHECK=1
+  fi
+  echo "DEBUG: COMMITS <= 1: $([ "$COMMITS_CHECK" -eq 1 ] && echo "YES" || echo "NO")" >&2
+  
+  if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS_CHECK" -eq 1 ]; then
     echo "DEBUG: Entering diff application section!" >&2
     # Check if this is oracle agent path (git commands failed)
     if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
