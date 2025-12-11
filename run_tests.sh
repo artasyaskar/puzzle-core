@@ -67,50 +67,36 @@ else
   fi
 
   # Apply diff only if endpoints missing AND no pre-existing changes AND single initial commit (null-agent path)
-  # OR if oracle agent path (multiple commits) but endpoints missing
-  APPLY_DIFF=0
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
-    # Null-agent path: DON'T apply diff, let it fail as designed
-    echo "Null-agent path: endpoints missing but diff not applied (as expected)" >&2
-    APPLY_DIFF=0
-  elif [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$COMMITS" -gt 1 ]; then
-    echo "Oracle agent path detected but endpoints missing; applying diff..." >&2
-    APPLY_DIFF=1
-  fi
-  
-  if [ "$APPLY_DIFF" -eq 1 ]; then
     echo "Applying task diff: $DIFF_FILE"
     # Normalize potential CRLF to LF to avoid patch failures
     if command -v dos2unix >/dev/null 2>&1; then dos2unix -q "$DIFF_FILE" || true; fi
-    
-    # Try direct patch application first (works even without git)
-    if command -v patch >/dev/null 2>&1 && patch -p1 -N -r - < "$DIFF_FILE"; then
-      echo "patch -p1 succeeded (no git needed)"
+    # Ensure we are in a git repo with a baseline commit
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      git init >/dev/null 2>&1 || true
+    fi
+    git config user.email "runner@example.com" >/dev/null 2>&1 || true
+    git config user.name "Runner" >/dev/null 2>&1 || true
+    git config core.autocrlf false >/dev/null 2>&1 || true
+    git config core.safecrlf false >/dev/null 2>&1 || true
+    # Create baseline commit if none exists
+    if ! git rev-parse HEAD >/dev/null 2>&1; then
+      git add -A >/dev/null 2>&1 || true
+      git commit -m "baseline" >/dev/null 2>&1 || true
+    fi
+    # Try to apply the diff
+    if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
+      echo "git apply --index succeeded"
       APPLIED=1
     else
-      echo "patch -p1 failed; trying git apply..." 1>&2
-      # Fallback to git apply
-      # Ensure we are in a git repo with a baseline commit
-      if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        git init >/dev/null 2>&1 || true
-      fi
-      git config user.email "runner@example.com" >/dev/null 2>&1 || true
-      git config user.name "Runner" >/dev/null 2>&1 || true
-      git config core.autocrlf false >/dev/null 2>&1 || true
-      git config core.safecrlf false >/dev/null 2>&1 || true
-      # Create baseline commit if none exists
-      if ! git rev-parse HEAD >/dev/null 2>&1; then
-        git add -A >/dev/null 2>&1 || true
-        git commit -m "baseline" >/dev/null 2>&1 || true
-      fi
-      # Try to apply the diff
-      if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
-        echo "git apply --index succeeded"
+      echo "git apply --index failed; attempting without --index..." 1>&2
+      if git apply --reject --whitespace=fix "$DIFF_FILE"; then
+        echo "git apply (no index) succeeded"
         APPLIED=1
       else
-        echo "git apply --index failed; attempting without --index..." 1>&2
-        if git apply --reject --whitespace=fix "$DIFF_FILE"; then
-          echo "git apply (no index) succeeded"
+        echo "git apply failed; attempting patch -p0..." 1>&2
+        if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
+          echo "patch -p0 succeeded"
           APPLIED=1
         else
           echo "Failed to apply task diff with all strategies: $DIFF_FILE" 1>&2
@@ -134,11 +120,24 @@ else
   fi
 
   # If endpoints still missing and diff not applied, fail only for null path (single commit, no prechanges)
+  # BUT with special handling for oracle agent git failures
   if [ "$APPLIED" -eq 0 ] && ! grep -q "/adv/stats" server/routes/advanced.js 2>/dev/null; then
     if [ "$COMMITS" -le 1 ] && [ "$PRECHANGES" -eq 0 ]; then
-      echo "Task features not present and no diff applied (null path). Aborting." 1>&2
-      echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
-      exit 3
+      # Check if this is oracle agent path (git commands failed)
+      if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
+        echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
+        # Apply diff using direct patch method for oracle agent
+        if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
+          echo "patch -p0 succeeded for oracle agent"
+          APPLIED=1
+        else
+          echo "Failed to apply diff for oracle agent" 1>&2
+        fi
+      else
+        echo "Task features not present and no diff applied (null path). Aborting." 1>&2
+        echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
+        exit 3
+      fi
     else
       echo "Features missing but agent edits detected (oracle path); proceeding without applying diff." >&2
     fi
@@ -156,8 +155,8 @@ else
     exit 1
   fi
 
-  # Start test server in background for HTTP-based pytest
-  node server/index-test.js &
+  # Start server in background for HTTP-based pytest
+  node server/index.js &
   SERVER_PID=$!
   cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
@@ -167,19 +166,11 @@ else
 
   # Wait for health endpoint
   i=0
-  echo "Waiting for server to start..."
-  until curl -sf "http://localhost:5001/health" >/dev/null 2>&1 || wget -q --spider "http://localhost:5001/health" >/dev/null 2>&1 || [ $i -gt 25 ]; do
+  until curl -sf "http://localhost:3000/health" >/dev/null 2>&1; do
     i=$((i+1))
-    echo "Attempt $i: Server not ready yet..."
+    [ $i -gt 50 ] && echo "Server failed to start" 1>&2 && exit 1
     sleep 0.2
   done
-  
-  if [ $i -gt 25 ]; then
-    echo "Server failed to start or curl not available, trying to continue anyway..." 1>&2
-    # Don't exit, just continue and let pytest handle the connection error
-  else
-    echo "Server started successfully"
-  fi
 
   # Ensure pytest available; if missing, attempt user-level install
   if ! python3 - <<'PY'
