@@ -67,36 +67,53 @@ else
   fi
 
   # Apply diff only if endpoints missing AND no pre-existing changes AND single initial commit (null-agent path)
+  # OR if oracle agent path but git setup failed (no git repository)
+  GIT_WORKING=0
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    GIT_WORKING=1
+  fi
+  
+  APPLY_DIFF=0
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
+    APPLY_DIFF=1
+  elif [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$GIT_WORKING" -eq 0 ]; then
+    echo "Git not working but diff file exists; applying diff for oracle agent..." >&2
+    APPLY_DIFF=1
+  fi
+  
+  if [ "$APPLY_DIFF" -eq 1 ]; then
     echo "Applying task diff: $DIFF_FILE"
     # Normalize potential CRLF to LF to avoid patch failures
     if command -v dos2unix >/dev/null 2>&1; then dos2unix -q "$DIFF_FILE" || true; fi
-    # Ensure we are in a git repo with a baseline commit
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      git init >/dev/null 2>&1 || true
-    fi
-    git config user.email "runner@example.com" >/dev/null 2>&1 || true
-    git config user.name "Runner" >/dev/null 2>&1 || true
-    git config core.autocrlf false >/dev/null 2>&1 || true
-    git config core.safecrlf false >/dev/null 2>&1 || true
-    # Create baseline commit if none exists
-    if ! git rev-parse HEAD >/dev/null 2>&1; then
-      git add -A >/dev/null 2>&1 || true
-      git commit -m "baseline" >/dev/null 2>&1 || true
-    fi
-    # Try to apply the diff
-    if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
-      echo "git apply --index succeeded"
+    
+    # Try direct patch application first (works even without git)
+    if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
+      echo "patch -p0 succeeded (no git needed)"
       APPLIED=1
     else
-      echo "git apply --index failed; attempting without --index..." 1>&2
-      if git apply --reject --whitespace=fix "$DIFF_FILE"; then
-        echo "git apply (no index) succeeded"
+      echo "patch -p0 failed; trying git apply..." 1>&2
+      # Fallback to git apply
+      # Ensure we are in a git repo with a baseline commit
+      if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git init >/dev/null 2>&1 || true
+      fi
+      git config user.email "runner@example.com" >/dev/null 2>&1 || true
+      git config user.name "Runner" >/dev/null 2>&1 || true
+      git config core.autocrlf false >/dev/null 2>&1 || true
+      git config core.safecrlf false >/dev/null 2>&1 || true
+      # Create baseline commit if none exists
+      if ! git rev-parse HEAD >/dev/null 2>&1; then
+        git add -A >/dev/null 2>&1 || true
+        git commit -m "baseline" >/dev/null 2>&1 || true
+      fi
+      # Try to apply the diff
+      if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
+        echo "git apply --index succeeded"
         APPLIED=1
       else
-        echo "git apply failed; attempting patch -p0..." 1>&2
-        if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
-          echo "patch -p0 succeeded"
+        echo "git apply --index failed; attempting without --index..." 1>&2
+        if git apply --reject --whitespace=fix "$DIFF_FILE"; then
+          echo "git apply (no index) succeeded"
           APPLIED=1
         else
           echo "Failed to apply task diff with all strategies: $DIFF_FILE" 1>&2
