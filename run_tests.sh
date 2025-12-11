@@ -67,42 +67,81 @@ else
   fi
 
   # Apply diff only if endpoints missing AND no pre-existing changes AND single initial commit (null-agent path)
+  # OR if oracle agent path (git fails) but endpoints missing
+  echo "DEBUG: Checking diff application conditions..." >&2
+  echo "DEBUG: DIFF_FILE exists: $([ -f "$DIFF_FILE" ] && echo "YES" || echo "NO")" >&2
+  echo "DEBUG: ENDPOINTS_PRESENT: $ENDPOINTS_PRESENT" >&2
+  echo "DEBUG: PRECHANGES: $PRECHANGES" >&2
+  echo "DEBUG: COMMITS: $COMMITS" >&2
+  echo "DEBUG: COMMITS <= 1: $([ "$COMMITS" -le 1 ] && echo "YES" || echo "NO")" >&2
+  
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS" -le 1 ]; then
-    echo "Applying task diff: $DIFF_FILE"
-    # Normalize potential CRLF to LF to avoid patch failures
-    if command -v dos2unix >/dev/null 2>&1; then dos2unix -q "$DIFF_FILE" || true; fi
-    # Ensure we are in a git repo with a baseline commit
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      git init >/dev/null 2>&1 || true
-    fi
-    git config user.email "runner@example.com" >/dev/null 2>&1 || true
-    git config user.name "Runner" >/dev/null 2>&1 || true
-    git config core.autocrlf false >/dev/null 2>&1 || true
-    git config core.safecrlf false >/dev/null 2>&1 || true
-    # Create baseline commit if none exists
-    if ! git rev-parse HEAD >/dev/null 2>&1; then
-      git add -A >/dev/null 2>&1 || true
-      git commit -m "baseline" >/dev/null 2>&1 || true
-    fi
-    # Try to apply the diff
-    if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
-      echo "git apply --index succeeded"
-      APPLIED=1
-    else
-      echo "git apply --index failed; attempting without --index..." 1>&2
-      if git apply --reject --whitespace=fix "$DIFF_FILE"; then
-        echo "git apply (no index) succeeded"
-        APPLIED=1
-      else
-        echo "git apply failed; attempting patch -p0..." 1>&2
-        if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
-          echo "patch -p0 succeeded"
+    echo "DEBUG: Entering diff application section!" >&2
+    # Check if this is oracle agent path (git commands failed)
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
+      echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
+      echo "DEBUG: DIFF_FILE=$DIFF_FILE" >&2
+      echo "DEBUG: Checking if patch command exists..." >&2
+      if command -v patch >/dev/null 2>&1; then
+        echo "DEBUG: Patch command found, attempting to apply diff..." >&2
+        if patch -p0 -N -r - < "$DIFF_FILE"; then
+          echo "patch -p0 succeeded for oracle agent"
           APPLIED=1
         else
-          echo "Failed to apply task diff with all strategies: $DIFF_FILE" 1>&2
-          ls -la "tasks" || true
-          ls -la "tasks/${TASK_ID}" || true
-          exit 2
+          echo "DEBUG: Patch command failed with exit code $?" >&2
+          echo "Failed to apply diff for oracle agent with patch, trying git apply..." 1>&2
+        fi
+      else
+        echo "DEBUG: Patch command not found!" >&2
+        echo "Failed to apply diff for oracle agent with patch, trying git apply..." 1>&2
+      fi
+      # Try git apply as last resort (will likely fail in oracle container)
+      echo "DEBUG: Trying git apply as fallback..." >&2
+      if git apply --reject --whitespace=fix "$DIFF_FILE" 2>/dev/null; then
+        echo "git apply succeeded as fallback"
+        APPLIED=1
+      else
+        echo "DEBUG: Git apply failed with exit code $?" >&2
+        echo "Both patch and git apply failed for oracle agent" 1>&2
+      fi
+    else
+      # Null-agent path: apply diff normally using git
+      echo "Applying task diff: $DIFF_FILE"
+      # Normalize potential CRLF to LF to avoid patch failures
+      if command -v dos2unix >/dev/null 2>&1; then dos2unix -q "$DIFF_FILE" || true; fi
+      # Ensure we are in a git repo with a baseline commit
+      if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git init >/dev/null 2>&1 || true
+      fi
+      git config user.email "runner@example.com" >/dev/null 2>&1 || true
+      git config user.name "Runner" >/dev/null 2>&1 || true
+      git config core.autocrlf false >/dev/null 2>&1 || true
+      git config core.safecrlf false >/dev/null 2>&1 || true
+      # Create baseline commit if none exists
+      if ! git rev-parse HEAD >/dev/null 2>&1; then
+        git add -A >/dev/null 2>&1 || true
+        git commit -m "baseline" >/dev/null 2>&1 || true
+      fi
+      # Try to apply the diff
+      if git apply --index --reject --whitespace=fix "$DIFF_FILE"; then
+        echo "git apply --index succeeded"
+        APPLIED=1
+      else
+        echo "git apply --index failed; attempting without --index..." 1>&2
+        if git apply --reject --whitespace=fix "$DIFF_FILE"; then
+          echo "git apply (no index) succeeded"
+          APPLIED=1
+        else
+          echo "git apply failed; attempting patch -p0..." 1>&2
+          if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
+            echo "patch -p0 succeeded"
+            APPLIED=1
+          else
+            echo "Failed to apply task diff with all strategies: $DIFF_FILE" 1>&2
+            ls -la "tasks" || true
+            ls -la "tasks/${TASK_ID}" || true
+            exit 2
+          fi
         fi
       fi
     fi
@@ -120,31 +159,11 @@ else
   fi
 
   # If endpoints still missing and diff not applied, fail only for null path (single commit, no prechanges)
-  # BUT with special handling for oracle agent git failures
   if [ "$APPLIED" -eq 0 ] && ! grep -q "/adv/stats" server/routes/advanced.js 2>/dev/null; then
     if [ "$COMMITS" -le 1 ] && [ "$PRECHANGES" -eq 0 ]; then
-      # Check if this is oracle agent path (git commands failed)
-      if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$COMMITS" -eq 0 ]; then
-        echo "Oracle agent detected (git not working) but endpoints missing; applying diff..." >&2
-        # Apply diff using direct patch method for oracle agent (git doesn't work in container)
-        if command -v patch >/dev/null 2>&1 && patch -p0 -N -r - < "$DIFF_FILE"; then
-          echo "patch -p0 succeeded for oracle agent"
-          APPLIED=1
-        else
-          echo "Failed to apply diff for oracle agent with patch, trying git apply..." 1>&2
-          # Try git apply as last resort (will likely fail in oracle container)
-          if git apply --reject --whitespace=fix "$DIFF_FILE" 2>/dev/null; then
-            echo "git apply succeeded as fallback"
-            APPLIED=1
-          else
-            echo "Both patch and git apply failed for oracle agent" 1>&2
-          fi
-        fi
-      else
-        echo "Task features not present and no diff applied (null path). Aborting." 1>&2
-        echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
-        exit 3
-      fi
+      echo "Task features not present and no diff applied (null path). Aborting." 1>&2
+      echo "Hint: ensure tasks/${TASK_ID}/task_diff.txt exists and matches repository baseline." 1>&2
+      exit 3
     else
       echo "Features missing but agent edits detected (oracle path); proceeding without applying diff." >&2
     fi
