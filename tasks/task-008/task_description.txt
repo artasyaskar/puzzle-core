@@ -1,0 +1,62 @@
+task_description: |
+  Task: Extend Authentication API with User Management Features
+
+  Instructions:
+  Enhance the existing authentication endpoints by adding new user management functionality to server/routes/auth-mock.js
+
+  1. Add POST /api/auth/users - get all users (admin only)
+  2. Add PUT /api/auth/users/:id - update user profile
+  3. Add DELETE /api/auth/users/:id - delete user account
+  4. Add POST /api/auth/change-password - change user password
+  5. Add POST /api/auth/forgot-password - initiate password reset
+  6. Add POST /api/auth/reset-password - complete password reset
+
+  Each endpoint should be added to the existing auth-mock.js file, not create new files
+
+  Background:
+  The authentication system needs additional user management features to handle profile updates, password management, and administrative functions
+
+  Steps:
+  1. Edit server/routes/auth-mock.js to add 6 new endpoints
+  2. Implement user management and password operations
+  3. Test with the provided test suite
+  4. All endpoints should use proper authentication and authorization
+
+  Expected functionality:
+  The users endpoint returns list of all users for admin: {"admin": true} returns users array
+  The update endpoint modifies user profile: PUT /api/auth/users/123 with profile data
+  The delete endpoint removes user account: DELETE /api/auth/users/123
+  The change-password endpoint updates password: {"currentPassword": "old", "newPassword": "new"}
+  The forgot-password endpoint generates reset token: {"email": "user@example.com"}
+  The reset-password endpoint completes reset: {"token": "reset-token", "newPassword": "new"}
+  Handle edge cases like non-existent users, invalid tokens, and unauthorized access
+  Use proper input validation and error handling
+
+  Technical requirements:
+  - Edit existing server/routes/auth-mock.js file
+  - Use existing JWT token system for authentication
+  - Add admin role checking for admin endpoints
+  - Add password reset token storage and validation
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+  - Follow existing code patterns in the file
+
+  Success criteria:
+  All six new endpoints work correctly with various inputs
+  Proper error handling for invalid inputs and unauthorized access
+  Clean, readable code following existing project conventions
+  Integration with existing auth system
+
+  Critical tested requirements:
+  POST /api/auth/users with {"admin": true} returns array of users
+  PUT /api/auth/users/123 with {"firstName": "Updated"} returns updated user
+  DELETE /api/auth/users/123 returns success message
+  POST /api/auth/change-password with valid credentials returns success
+  POST /api/auth/forgot-password with valid email returns reset token
+  POST /api/auth/reset-password with valid token returns success message
+
+difficulty: easy
+category: Enhancement
+tags: [authentication, user-management, security, enhancement]
+parser_name: pytest
