@@ -1,0 +1,62 @@
+task_description: |
+  Task: Extend Projects API with Advanced Project Management Features
+
+  Instructions:
+  Enhance the existing projects endpoints by adding advanced project management functionality to server/routes/projects-mock.js
+
+  1. Add GET /api/projects/:id - get single project details
+  2. Add PUT /api/projects/:id - update project details
+  3. Add DELETE /api/projects/:id - delete project
+  4. Add POST /api/projects/:id/members - add team member to project
+  5. Add DELETE /api/projects/:id/members/:userId - remove team member
+  6. Add POST /api/projects/:id/status - update project status
+
+  Each endpoint should be added to the existing projects-mock.js file, not create new files
+
+  Background:
+  The project management system needs advanced features like detailed project views, member management, and status tracking to support collaborative work
+
+  Steps:
+  1. Edit server/routes/projects-mock.js to add 6 new endpoints
+  2. Implement project CRUD operations and member management
+  3. Test with the provided test suite
+  4. All endpoints should use proper authentication and authorization
+
+  Expected functionality:
+  The get project endpoint returns full project details: GET /api/projects/123
+  The update endpoint modifies project: PUT /api/projects/123 with {"name": "Updated Project"}
+  The delete endpoint removes project: DELETE /api/projects/123
+  The add member endpoint adds team member: POST /api/projects/123/members with {"userId": "456", "role": "developer"}
+  The remove member endpoint removes team member: DELETE /api/projects/123/members/456
+  The status endpoint updates project status: POST /api/projects/123/status with {"status": "in-progress"}
+  Handle edge cases like non-existent projects, unauthorized access, and invalid member operations
+  Use proper input validation and error handling
+
+  Technical requirements:
+  - Edit existing server/routes/projects-mock.js file
+  - Use existing JWT token system for authentication
+  - Add project members array and status field to project model
+  - Add role-based access control for member management
+  - Return proper HTTP status codes
+  - Use consistent JSON response format
+  - Include basic input validation
+  - Follow existing code patterns in the file
+
+  Success criteria:
+  All six new endpoints work correctly with various inputs
+  Proper error handling for invalid inputs and unauthorized access
+  Clean, readable code following existing project conventions
+  Integration with existing auth system
+
+  Critical tested requirements:
+  GET /api/projects/123 returns project details with members
+  PUT /api/projects/123 with {"name": "Updated"} returns updated project
+  DELETE /api/projects/123 returns success message
+  POST /api/projects/123/members with member data returns updated project
+  DELETE /api/projects/123/members/456 returns updated project
+  POST /api/projects/123/status with {"status": "completed"} returns updated project
+
+difficulty: easy
+category: Enhancement
+tags: [projects, management, collaboration, enhancement]
+parser_name: pytest
