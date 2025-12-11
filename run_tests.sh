@@ -78,7 +78,8 @@ else
   echo "DEBUG: DIFF_FILE exists: $([ -f "$DIFF_FILE" ] && echo "YES" || echo "NO")" >&2
   echo "DEBUG: ENDPOINTS_PRESENT: $ENDPOINTS_PRESENT" >&2
   echo "DEBUG: PRECHANGES: $PRECHANGES" >&2
-  echo "DEBUG: COMMITS: $COMMITS" >&2
+  echo "DEBUG: COMMITS: '$COMMITS'" >&2
+  echo "DEBUG: About to enter robust check..." >&2
   
   # Use a more robust check for commits count
   COMMITS_CHECK=0
@@ -86,14 +87,20 @@ else
   case "$COMMITS" in
     ''|*[!0-9]*) 
       COMMITS_CHECK=0
+      echo "DEBUG: COMMITS is empty or non-numeric" >&2
       ;;
     *)
       if [ "$COMMITS" -le 1 ] 2>/dev/null; then
         COMMITS_CHECK=1
+        echo "DEBUG: COMMITS is numeric and <= 1" >&2
+      else
+        echo "DEBUG: COMMITS is numeric but > 1" >&2
       fi
       ;;
   esac
+  echo "DEBUG: COMMITS_CHECK = $COMMITS_CHECK" >&2
   echo "DEBUG: COMMITS <= 1: $([ "$COMMITS_CHECK" -eq 1 ] && echo "YES" || echo "NO")" >&2
+  echo "DEBUG: About to check diff conditions..." >&2
   
   if [ -f "$DIFF_FILE" ] && [ "$ENDPOINTS_PRESENT" -eq 0 ] && [ "$PRECHANGES" -eq 0 ] && [ "$COMMITS_CHECK" -eq 1 ]; then
     echo "DEBUG: Entering diff application section!" >&2
