@@ -186,7 +186,7 @@ else
   fi
 
   # Start server in background for HTTP-based pytest
-  node server/index.js &
+  node server/index-test.js &
   SERVER_PID=$!
   cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
@@ -196,7 +196,7 @@ else
 
   # Wait for health endpoint
   i=0
-  until curl -sf "http://localhost:3000/health" >/dev/null 2>&1; do
+  until curl -sf "http://localhost:5001/health" >/dev/null 2>&1; do
     i=$((i+1))
     [ $i -gt 50 ] && echo "Server failed to start" 1>&2 && exit 1
     sleep 0.2
